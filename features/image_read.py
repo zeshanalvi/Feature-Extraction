@@ -35,7 +35,7 @@ class Dataset:
       self.images=ima
       return ima
    
-   def get_labels(self,labels):
+   def get_labels_text(self,labels):
       return [self.label_map[l-1] for l in labels]
    
    def paths_no_class(self,base_path,folder,count,ima,label):
