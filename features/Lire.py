@@ -11,16 +11,10 @@ warnings.filterwarnings('ignore')
 from skimage.feature import hog
 from skimage.color import rgb2gray
 #import mahotas
-
-
 from image_read import Dataset
-
-
-import cv2
-import numpy as np
-
-import numpy as np
+from skimage.feature import hog
 from skimage import io, color
+
 
 def compute_glcm(img, distances=[1], angles=[0], levels=256):
     h, w = img.shape
@@ -42,7 +36,78 @@ def quantize_image(img, bins_per_channel=8):
     quantized = np.digitize(img, bins) - 1
     return quantized
 
-def color_correlogram(img, distances=[1, 3, 5], bins_per_channel=8):
+import cv2
+import numpy as np
+
+def color_correlogram(img, bins=32, distances=32):
+    """
+    Extracts a color correlogram of size bins*distances (default: 1024).
+    
+    Args:
+        img: input BGR image (OpenCV format)
+        bins: number of quantized colors (default 32)
+        distances: number of distances (default 32)
+
+    Returns:
+        feature vector of shape (bins * distances,) e.g. (1024,)
+    """
+    # Resize for consistency
+    img_small = cv2.resize(img, (64, 64))
+
+    # Quantize colors into bins using HSV (better for color perception)
+    hsv = cv2.cvtColor(img_small, cv2.COLOR_BGR2HSV)
+    h_bins, s_bins, v_bins = 4, 4, 2  # 4*4*2 = 32 bins
+    quant = np.floor_divide(hsv[..., 0], 180 // h_bins) * (s_bins * v_bins) \
+            + np.floor_divide(hsv[..., 1], 256 // s_bins) * v_bins \
+            + np.floor_divide(hsv[..., 2], 256 // v_bins)
+    idx = quant.astype(int)
+
+    h, w = idx.shape
+    features = []
+
+    # For each distance d
+    for d in range(1, distances+1):
+        correlogram = np.zeros(bins, dtype=np.float32)
+        count = np.zeros(bins, dtype=np.float32)
+
+        for y in range(h):
+            for x in range(w):
+                color = idx[y, x]
+                # Check right neighbor
+                if x+d < w:
+                    if idx[y, x+d] == color:
+                        correlogram[color] += 1
+                # Check down neighbor
+                if y+d < h:
+                    if idx[y+d, x] == color:
+                        correlogram[color] += 1
+                count[color] += 2  # two checks per pixel
+
+        correlogram = correlogram / (count + 1e-6)  # normalize per color
+        features.extend(correlogram)
+
+    return np.array(features)  # (1024,)
+
+
+def color_correlogram3(img, bins=32, distances=32):
+    img_small = cv2.resize(img, (64, 64))
+    quant = np.floor_divide(img_small, 256 // (bins // 3))
+    idx = quant[..., 0]*(bins//3)**2 + quant[..., 1]*(bins//3) + quant[..., 2]
+
+    h, w = idx.shape
+    features = []
+    for d in range(1, distances+1):  # 32 distances
+        correlogram = np.zeros(bins)
+        for y in range(h):
+            for x in range(w):
+                color = idx[y, x]
+                if y+d < h and idx[y+d, x] == color: correlogram[color]+=1
+                if x+d < w and idx[y, x+d] == color: correlogram[color]+=1
+        features.extend(correlogram)
+    return np.array(features)  # (1024,)
+#def color_correlogram1(img, distances=[1, 3, 5], bins_per_channel=8):
+
+def color_correlogram1(img, distances=[32], bins_per_channel=32):
     """
     Compute Color Correlogram of an image.
     
@@ -84,8 +149,24 @@ def color_correlogram(img, distances=[1, 3, 5], bins_per_channel=8):
     correlogram /= correlogram.sum(axis=1, keepdims=True) + 1e-8
     return correlogram.flatten()
 
+def tamura_features(img, blocks=6):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    fh, fw = h // blocks, w // blocks
 
-def tamura_features(img, distances=[1], angles=[0], levels=256):
+    feats = []
+    for i in range(3):  # 3 regions vertically
+        for j in range(2):  # 2 regions horizontally = 6 patches
+            patch = gray[i*fh:(i+1)*fh, j*fw:(j+1)*fw]
+            var = np.var(patch)
+            contrast = patch.std()
+            gx = cv2.Sobel(patch, cv2.CV_32F, 1, 0)
+            gy = cv2.Sobel(patch, cv2.CV_32F, 0, 1)
+            ang = np.arctan2(gy, gx).mean()
+            feats.extend([var, contrast, ang])
+    return np.array(feats)  # (18,)
+
+def tamura_features2(img, distances=[1], angles=[0], levels=256):
     """
     Compute basic Tamura features: contrast, energy, homogeneity (from GLCM)
     img: grayscale image (0-255)
@@ -159,7 +240,29 @@ def edge_histogram(img, grid=4):
     edge_hist /= edge_hist.sum() + 1e-8
     return edge_hist
 
-def jcd_descriptor(img):
+def jcd_descriptor(img, color_bins=64, edge_bins=272):
+    # Resize for consistency
+    img_resized = cv2.resize(img, (128, 128))
+    
+    # ---- Color Histogram part ----
+    hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1, 2], None, [4, 4, 4], [0, 180, 0, 256, 0, 256])
+    hist = cv2.normalize(hist, hist).flatten()  # 64 bins
+
+    # ---- Edge Histogram part ----
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=True)
+    bins = np.int32(ang / 360 * edge_bins) % edge_bins
+    edge_hist, _ = np.histogram(bins, bins=edge_bins, range=(0, edge_bins))
+    edge_hist = edge_hist.astype("float32")
+    edge_hist /= (edge_hist.sum() + 1e-6)
+
+    # Concatenate → 64 + 274 = 338
+    return np.hstack([hist, edge_hist])
+
+def jcd_descriptor1(img):
     """
     Approximation of JCD (Joint Composite Descriptor).
     Combines color histogram + edge histogram + Tamura.
@@ -177,7 +280,24 @@ def jcd_descriptor(img):
 
     return color_hist #np.concatenate([color_hist, edge_feat, texture_feat])
 
-def PHOG(img):
+def PHOG(img, bins=14, levels=5):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    phog_vec = []
+    h, w = gray.shape
+
+    for l in range(levels):
+        step_y, step_x = h // (2**l), w // (2**l)
+        for i in range(2**l):
+            for j in range(2**l):
+                patch = gray[i*step_y:(i+1)*step_y, j*step_x:(j+1)*step_x]
+                if patch.size > 0:
+                    feat = hog(patch, orientations=bins,
+                               pixels_per_cell=(8,8), cells_per_block=(1,1),
+                               feature_vector=True)
+                    phog_vec.extend(feat[:bins])  
+    return np.array(phog_vec[:630])  # (630,)
+
+def PHOG1(img):
    # -------------------- SHAPE FEATURES --------------------
     # 5. PHOG (via HOG)
     phog_features, _ = hog(
@@ -236,13 +356,13 @@ def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4
 
 def extract_lire(image_path):
     img = cv2.imread(image_path)
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     features = {}
     # -------------------- COLOR FEATURES --------------------
     # 1. Color Histogram
-    hist = cv2.calcHist([img], [0, 1, 2], None, [8, 8, 8], [0,256, 0,256, 0,256])
-    hist = cv2.normalize(hist, hist).flatten()
-    features['color_histogram'] = hist
+    #hist = cv2.calcHist([img], [0, 1, 2], None, [8, 8, 8], [0,256, 0,256, 0,256])
+    #hist = cv2.normalize(hist, hist).flatten()
+    #features['color_histogram'] = hist
 
     features['color_layout'] = color_layout(img)
 
@@ -257,35 +377,55 @@ def extract_lire(image_path):
     
     features['phog'] = PHOG(img)
     features['color_correlogram']=color_correlogram(img)
-    features['tamura']=color_correlogram(img)
+    features['tamura']=tamura_features(img)
     features['edge_histogram']=edge_histogram(img)
     features['jcd']=jcd_descriptor(img)
 
     return features
 
-
-
-
 def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
   #paths,label,labels=gather_paths_all(jpg_path=data_path,num_classes=num_classes)
+  
 
+
+  pindex=[p.split("/")[-1] for p in paths]
+
+
+  ary=np.zeros((len(paths),48),np.float64)
   for i,p in enumerate(paths):
-     featuresi=extract_lire(image_path=paths[i])
-     for i,f in enumerate(featuresi):
-        print(i,f,featuresi[f].shape)
-     return 
+     ary[i,:]=color_layout(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"color_layout.csv",index=True)
 
-#color_histogram (512,)
-#color_layout (48,)35
-#phog (55440,) 632
-#color_correlogram (1536,) 1026
-#tamura (1536,) 20
-#edge_histogram (80,) 82
-#JCD 338
+  ary=np.zeros((len(paths),630),np.float64)
+  for i,p in enumerate(paths):
+     ary[i,:]=PHOG(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"phog.csv",index=True)
+  
+  ary=np.zeros((len(paths),1024),np.float64)
+  for i,p in enumerate(paths):
+     ary[i,:]=color_correlogram(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"color_correlogram.csv",index=True)
+  
+  ary=np.zeros((len(paths),18),np.float64)
+  for i,p in enumerate(paths):
+     ary[i,:]=tamura_features(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"tamura_features.csv",index=True)
+  
+  ary=np.zeros((len(paths),80),np.float64)
+  for i,p in enumerate(paths):
+     ary[i,:]=edge_histogram(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"edge_histogram.csv",index=True)
+  
+  ary=np.zeros((len(paths),336),np.float64)
+  for i,p in enumerate(paths):
+     ary[i,:]=jcd_descriptor(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"jcd_descriptor.csv",index=True)
 
-data_path_train="D:\\datasets\\Kvasirv1_dev\\dev\\"
-num_classes=8
-storage_path="D:\\datasets\\Kvasirv1_dev\\test\\"
+
+data_path_train="D:\\datasets\\Kvasirv3_dev\\dev\\"
+num_classes=23
+storage_path="D:\\datasets\\Kvasirv3_dev\\test\\"
 kvasir=Dataset(num_classes=num_classes)
+print(kvasir.label_map)
 paths,label,labels=kvasir.gather_paths_all(jpg_path=data_path_train)
 get_lires(kvasir,paths=paths,label=label,storage_path=storage_path,batch_size=2000)
