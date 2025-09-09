@@ -4,7 +4,6 @@ from skimage import feature
 import warnings
 warnings.filterwarnings('ignore')
 
-
 #from skimage.feature import greycomatrix, greycoprops
 #from skimage.feature.texture import greycomatrix, greycoprops
 
