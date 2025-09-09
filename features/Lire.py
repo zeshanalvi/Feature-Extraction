@@ -423,7 +423,7 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
 
 data_path_train="D:\\datasets\\Kvasirv3_dev\\dev\\"
 num_classes=23
-storage_path="D:\\datasets\\Kvasirv3_dev\\test\\"
+storage_path="D:\\datasets\\Kvasirv3_dev\\lire\\"
 kvasir=Dataset(num_classes=num_classes)
 print(kvasir.label_map)
 paths,label,labels=kvasir.gather_paths_all(jpg_path=data_path_train)
