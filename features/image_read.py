@@ -16,8 +16,8 @@ class Dataset:
          self.label_map=['retroflex-rectum', 'out-of-patient', 'ulcerative-colitis', 'normal-cecum', 'normal-z-line', 'dyed-lifted-polyps', 'blurry-nothing', 'retroflex-stomach', 'instruments', 'dyed-resection-margins', 'stool-plenty', 'esophagitis', 'normal-pylorus', 'polyps', 'stool-inclusions', 'colon-clear']
       if(self.num_classes==23):
          self.label_map=['barretts', 'barretts-short-segment', 'bbps-0-1', 'bbps-2-3', 'cecum', 'dyed-lifted-polyps', 'dyed-resection-margins', 'esophagitis-a', 'esophagitis-b-d',
-             'hemorrhoids', 'ileum', 'impacted-stool', 'normal-z-line', 'polyps', 'pylorus', 'retroflex-rectum', 'retroflex-stomach',
-             'ulcerative-colitis-0-1', 'ulcerative-colitis-1-2', 'ulcerative-colitis-2-3', 'ulcerative-colitis-grade-1', 'ulcerative-colitis-grade-2', 'ulcerative-colitis-grade-3']
+             'hemorrhoids', 'ileum', 'impacted-stool', 'z-line', 'polyps', 'pylorus', 'retroflex-rectum', 'retroflex-stomach',
+             'ulcerative-colitis-grade-0-1', 'ulcerative-colitis-grade-1-2', 'ulcerative-colitis-grade-2-3', 'ulcerative-colitis-grade-1', 'ulcerative-colitis-grade-2', 'ulcerative-colitis-grade-3']
       if(self.num_classes==36):
          self.label_map=['barretts', 'barretts-short-segment', 'bbps-0-1', 'bbps-2-3','cecum', 'normal-cecum', 'dyed-lifted-polyps', 'dyed-resection-margins',
          'esophagitis','esophagitis-a','esophagitis-b-d','hemorrhoids', 'ileum', 'impacted-stool','normal-z-line','polyps','pylorus','normal-pylorus',
