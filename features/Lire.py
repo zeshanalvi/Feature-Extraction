@@ -420,11 +420,3 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,:]=jcd_descriptor(cv2.imread(paths[i]))
   df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"jcd_descriptor.csv",index=True)
 
-
-data_path_train="D:\\datasets\\Kvasirv3_dev\\dev\\"
-num_classes=23
-storage_path="D:\\datasets\\Kvasirv3_dev\\lire\\"
-kvasir=Dataset(num_classes=num_classes)
-print(kvasir.label_map)
-paths,label,labels=kvasir.gather_paths_all(jpg_path=data_path_train)
-get_lires(kvasir,paths=paths,label=label,storage_path=storage_path,batch_size=2000)
