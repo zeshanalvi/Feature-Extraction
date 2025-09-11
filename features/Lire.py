@@ -10,9 +10,10 @@ warnings.filterwarnings('ignore')
 from skimage.feature import hog
 from skimage.color import rgb2gray
 #import mahotas
-from image_read import Dataset
 from skimage.feature import hog
 from skimage import io, color
+
+from .image_read import Dataset
 
 
 def compute_glcm(img, distances=[1], angles=[0], levels=256):
