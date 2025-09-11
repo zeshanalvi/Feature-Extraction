@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-from image_read import Dataset
+from .image_read import Dataset
 
 
 def get_lbp_single(image=None,radius=1,eps=1e-7):
