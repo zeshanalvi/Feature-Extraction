@@ -5,5 +5,5 @@
 
 # features/__init__.py
 from .Lire import get_lires
-from .LBP import get_lbp
+from .LBP import get_lbps
 from .image_read import read_image
