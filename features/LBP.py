@@ -45,11 +45,3 @@ def get_lbps(dataset,paths=None,label=None,storage_path=None,radii=[1,2,3,4,5],b
     files=[f.split("/")[-1] for f in paths]
     df = df.assign(filename=files)
     df.to_csv(storage_path+"_"+str(radius)+".csv")
-
-
-data_path_train="D:\\datasets\\Kvasirv1_dev\\dev\\"
-num_classes=8
-storage_path="D:\\datasets\\Kvasirv1_dev\\test\\"
-kvasir=Dataset(num_classes=num_classes)
-paths,label,labels=kvasir.gather_paths_all(jpg_path=data_path_train)
-get_lbps(kvasir,paths=paths,label=label,storage_path=storage_path,radii=[1],batch_size=2000)
