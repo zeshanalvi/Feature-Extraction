@@ -6,4 +6,4 @@
 # features/__init__.py
 from .Lire import get_lires
 from .LBP import get_lbps
-from .image_read import read_image
+from .image_read import Dataset
