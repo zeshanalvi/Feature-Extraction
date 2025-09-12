@@ -384,40 +384,43 @@ def extract_lire(image_path):
     return features
 
 def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
-  #paths,label,labels=gather_paths_all(jpg_path=data_path,num_classes=num_classes)
-  
-
-
+  #paths,label,labels=gather_paths_all(jpg_path=data_path,num_classes=num_classes)  
   pindex=[p.split("/")[-1] for p in paths]
 
 
-  ary=np.zeros((len(paths),48),np.float64)
+  ary=np.zeros((len(paths),49),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=color_layout(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"color_layout.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=color_layout(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_layout.csv",index=True)
 
-  ary=np.zeros((len(paths),630),np.float64)
+  ary=np.zeros((len(paths),631),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=PHOG(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"phog.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=PHOG(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
   
-  ary=np.zeros((len(paths),1024),np.float64)
+  ary=np.zeros((len(paths),1025),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=color_correlogram(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"color_correlogram.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=color_correlogram(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_correlogram.csv",index=True)
   
-  ary=np.zeros((len(paths),18),np.float64)
+  ary=np.zeros((len(paths),19),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=tamura_features(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"tamura_features.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=tamura_features(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"tamura_features.csv",index=True)
   
-  ary=np.zeros((len(paths),80),np.float64)
+  ary=np.zeros((len(paths),81),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=edge_histogram(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"edge_histogram.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=edge_histogram(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"edge_histogram.csv",index=True)
   
-  ary=np.zeros((len(paths),336),np.float64)
+  ary=np.zeros((len(paths),337),np.float64)
   for i,p in enumerate(paths):
-     ary[i,:]=jcd_descriptor(cv2.imread(paths[i]))
-  df = pd.DataFrame(ary, index=pindex).to_csv(storage_path+"jcd_descriptor.csv",index=True)
+     ary[i,0]=paths[i].split("/")[-1]
+     ary[i,1:]=jcd_descriptor(cv2.imread(paths[i]))
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"jcd_descriptor.csv",index=True)
 
