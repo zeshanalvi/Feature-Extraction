@@ -12,7 +12,7 @@ from skimage.color import rgb2gray
 #import mahotas
 from skimage.feature import hog
 from skimage import io, color
-
+import time
 from .image_read import Dataset
 
 
@@ -55,6 +55,7 @@ def color_correlogram(img, bins=32, distances=32):
     img_small = cv2.resize(img, (64, 64))
 
     # Quantize colors into bins using HSV (better for color perception)
+    st = time.time()
     hsv = cv2.cvtColor(img_small, cv2.COLOR_BGR2HSV)
     h_bins, s_bins, v_bins = 4, 4, 2  # 4*4*2 = 32 bins
     quant = np.floor_divide(hsv[..., 0], 180 // h_bins) * (s_bins * v_bins) \
@@ -86,7 +87,8 @@ def color_correlogram(img, bins=32, distances=32):
         correlogram = correlogram / (count + 1e-6)  # normalize per color
         features.extend(correlogram)
 
-    return np.array(features)  # (1024,)
+    t1 = time.time()-st
+    return np.array(features), t1  # (1024,)
 
 
 def color_correlogram3(img, bins=32, distances=32):
@@ -150,6 +152,7 @@ def color_correlogram1(img, distances=[32], bins_per_channel=32):
     return correlogram.flatten()
 
 def tamura_features(img, blocks=6):
+    st = time.time()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
     fh, fw = h // blocks, w // blocks
@@ -164,7 +167,8 @@ def tamura_features(img, blocks=6):
             gy = cv2.Sobel(patch, cv2.CV_32F, 0, 1)
             ang = np.arctan2(gy, gx).mean()
             feats.extend([var, contrast, ang])
-    return np.array(feats)  # (18,)
+    t1 = time.time()-st
+    return np.array(feats),t1  # (18,)
 
 def tamura_features2(img, distances=[1], angles=[0], levels=256):
     """
@@ -212,6 +216,7 @@ def edge_histogram(img, grid=4):
     """
     Edge Histogram Descriptor (EHD) approximation.
     """
+    st = time.time()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
     block_h, block_w = h // grid, w // grid
@@ -238,12 +243,13 @@ def edge_histogram(img, grid=4):
 
     edge_hist = np.array(edge_hist, dtype=np.float32)
     edge_hist /= edge_hist.sum() + 1e-8
-    return edge_hist
+    t1 = time.time()-st
+    return edge_hist,t1
 
 def jcd_descriptor(img, color_bins=64, edge_bins=272):
     # Resize for consistency
     img_resized = cv2.resize(img, (128, 128))
-    
+    s1 = time.time()
     # ---- Color Histogram part ----
     hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
     hist = cv2.calcHist([hsv], [0, 1, 2], None, [4, 4, 4], [0, 180, 0, 256, 0, 256])
@@ -259,8 +265,9 @@ def jcd_descriptor(img, color_bins=64, edge_bins=272):
     edge_hist = edge_hist.astype("float32")
     edge_hist /= (edge_hist.sum() + 1e-6)
 
+    t1 = time.time()-st
     # Concatenate → 64 + 274 = 338
-    return np.hstack([hist, edge_hist])
+    return np.hstack([hist, edge_hist]),t1
 
 def jcd_descriptor1(img):
     """
@@ -281,6 +288,7 @@ def jcd_descriptor1(img):
     return color_hist #np.concatenate([color_hist, edge_feat, texture_feat])
 
 def PHOG(img, bins=14, levels=5):
+    st = time.time()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     phog_vec = []
     h, w = gray.shape
@@ -295,7 +303,8 @@ def PHOG(img, bins=14, levels=5):
                                pixels_per_cell=(8,8), cells_per_block=(1,1),
                                feature_vector=True)
                     phog_vec.extend(feat[:bins])  
-    return np.array(phog_vec[:630])  # (630,)
+    t1 = time.time()-st
+    return np.array(phog_vec[:630]),t1
 
 def PHOG1(img):
    # -------------------- SHAPE FEATURES --------------------
@@ -311,7 +320,8 @@ def PHOG1(img):
     return phog_features
 
 def color_layout(img):
-   # 2. Color Layout Descriptor (approx using mean color of blocks)
+    st = time.time()
+    # 2. Color Layout Descriptor (approx using mean color of blocks)
     h, w, _ = img.shape
     blocks = 4
     block_h, block_w = h // blocks, w // blocks
@@ -320,7 +330,8 @@ def color_layout(img):
         for x in range(blocks):
             block = img[y*block_h:(y+1)*block_h, x*block_w:(x+1)*block_w]
             color_layout.extend(cv2.mean(block)[:3])  # average BGR
-    return np.array(color_layout)
+    t1 = time.time()-st
+    return np.array(color_layout),t1
    
 def weighted_correlation(glcm):
     levels = glcm.shape[0]
@@ -386,41 +397,54 @@ def extract_lire(image_path):
 def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
   #paths,label,labels=gather_paths_all(jpg_path=data_path,num_classes=num_classes)  
   pindex=[p.split("/")[-1] for p in paths]
+  total_time=0
 
 
   ary=np.zeros((len(paths),49),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=color_layout(cv2.imread(paths[i]))
+     ary[i,1:],t1=color_layout(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_layout.csv",index=True)
+  print("FPS for color_layout is",len(paths)/total_time)
 
   ary=np.zeros((len(paths),631),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=PHOG(cv2.imread(paths[i]))
+     ary[i,1:],t1=PHOG(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
+  print("FPS for phog is",len(paths)/total_time)
   
   ary=np.zeros((len(paths),1025),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=color_correlogram(cv2.imread(paths[i]))
+     ary[i,1:],t1=color_correlogram(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_correlogram.csv",index=True)
+  print("FPS for color_correlogram is",len(paths)/total_time)
   
   ary=np.zeros((len(paths),19),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=tamura_features(cv2.imread(paths[i]))
+     ary[i,1:],t1=tamura_features(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"tamura_features.csv",index=True)
+  print("FPS for tamura_features is",len(paths)/total_time)
   
   ary=np.zeros((len(paths),81),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=edge_histogram(cv2.imread(paths[i]))
+     ary[i,1:],t1=edge_histogram(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"edge_histogram.csv",index=True)
+  print("FPS for edge_histogram is",len(paths)/total_time)
   
   ary=np.zeros((len(paths),337),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:]=jcd_descriptor(cv2.imread(paths[i]))
+     ary[i,1:],t1=jcd_descriptor(cv2.imread(paths[i]))
+     total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"jcd_descriptor.csv",index=True)
+  print("FPS for jcd_descriptor is",len(paths)/total_time)
 
