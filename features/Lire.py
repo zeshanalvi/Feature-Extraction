@@ -407,14 +407,6 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_layout.csv",index=True)
   print("FPS for color_layout is",len(paths)/total_time)
-
-  ary=np.zeros((len(paths),631),dtype=object)
-  for i,p in enumerate(paths):
-     ary[i,0]=paths[i].split("/")[-2]
-     ary[i,1:],t1=PHOG(cv2.imread(paths[i]))
-     total_time+=t1
-  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
-  print("FPS for phog is",len(paths)/total_time)
   
   ary=np.zeros((len(paths),1025),dtype=object)
   for i,p in enumerate(paths):
@@ -447,4 +439,12 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"jcd_descriptor.csv",index=True)
   print("FPS for jcd_descriptor is",len(paths)/total_time)
+
+  ary=np.zeros((len(paths),631),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1:],t1=PHOG(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
+  print("FPS for phog is",len(paths)/total_time)
 
