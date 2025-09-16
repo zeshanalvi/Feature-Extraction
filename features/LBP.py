@@ -47,8 +47,10 @@ def get_lbps(dataset,paths=None,label=None,storage_path=None,radii=[1,2,3,4,5],b
     print("LBP FPS for Radii of \t",radius," is ",count/t1s,count/t2s)
     df=pd.DataFrame(f)
     Yl=[dataset.label_map[l-1] for l in label]
+    df = df.rename(columns={'0': 'new_col'})
     #df = df.assign('0'=label)
-    df = df.assign('0'=Yl)
+    df['0'] = Yl
+    #df = df.assign('0'=Yl)
     files=[f.split("/")[-1] for f in paths]
     df = df.assign(img=files)
     df=df.set_index('img')
