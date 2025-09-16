@@ -44,4 +44,5 @@ def get_lbps(dataset,paths=None,label=None,storage_path=None,radii=[1,2,3,4,5],b
     df = df.assign(Yl=Yl)
     files=[f.split("/")[-1] for f in paths]
     df = df.assign(filename=files)
+    df=df.set_index('filename')
     df.to_csv(storage_path+"_"+str(radius)+".csv")
