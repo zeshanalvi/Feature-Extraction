@@ -249,7 +249,7 @@ def edge_histogram(img, grid=4):
 def jcd_descriptor(img, color_bins=64, edge_bins=272):
     # Resize for consistency
     img_resized = cv2.resize(img, (128, 128))
-    s1 = time.time()
+    st = time.time()
     # ---- Color Histogram part ----
     hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
     hist = cv2.calcHist([hsv], [0, 1, 2], None, [4, 4, 4], [0, 180, 0, 256, 0, 256])
