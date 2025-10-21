@@ -1,7 +1,12 @@
 from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire, tamura_features, jcd_descriptor, PHOG
 from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
-
+def extract_features_batch(img_path,labeled=False):
+    dfs = [] 
+    for img in img_path:
+        dfs.append(extract_features_single(img_path=img,labeled=labeled))
+    return pd.concat(dfs)
+        
 def extract_features_single(img_path,labeled=False):
     """
     Extracts all features for a single image using the same structure
