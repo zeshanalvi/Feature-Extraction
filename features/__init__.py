@@ -4,6 +4,6 @@
 #from . import image_read
 
 # features/__init__.py
-from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, get_lire
+from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire
 from .LBP import get_lbps
 from .image_read import Dataset
