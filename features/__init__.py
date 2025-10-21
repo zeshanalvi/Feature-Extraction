@@ -47,7 +47,7 @@ def extract_features_batch(img_path, labeled=False):
 
     return pd.concat(dfs, ignore_index=True)
         
-def extract_features_single(img_path,labeled=False):
+def extract_features_single(img_path,labeled=False,image_data=None):
     """
     Extracts all features for a single image using the same structure
     as the batch feature generation code.
