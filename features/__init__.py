@@ -36,7 +36,7 @@ def extract_features_batch(img_path, labeled=False):
             # Give a fake name for consistency
             img_name = "tensor_input"
 
-            dfs.append(extract_features_single(img_path=img_name, labeled=labeled, image_data=img_np))
+            dfs.append(extract_features_single(img_path=img_name, labeled=labeled))#, image_data=img_np))
 
         # Handle string path input
         elif isinstance(img, str):
@@ -47,7 +47,7 @@ def extract_features_batch(img_path, labeled=False):
 
     return pd.concat(dfs, ignore_index=True)
         
-def extract_features_single(img_path,labeled=False,image_data=None):
+def extract_features_single(img_path,labeled=False):
     """
     Extracts all features for a single image using the same structure
     as the batch feature generation code.
