@@ -57,7 +57,23 @@ def extract_features_single(img_path,labeled=False,image_data=None):
 
     if image_data is not None:
         img = image_data
-        img_name = img_path  # passed by batch function
+
+        # If torch tensor → convert to numpy
+        if hasattr(img, "detach"):
+            img = img.detach().cpu().numpy()
+
+        # If shape is (1,3,224,224) → remove batch dimension
+        if img.ndim == 4 and img.shape[0] == 1:
+            img = img[0]
+
+        # If shape is (3,224,224) → convert to (224,224,3)
+        if img.ndim == 3 and img.shape[0] in [1, 3]:
+            img = np.transpose(img, (1, 2, 0))
+
+        # Convert float → uint8 if needed
+        if img.dtype != np.uint8:
+            img = (img * 255).clip(0, 255).astype(np.uint8)
+            
     else:
         img_name = img_path.split("/")[-1]
         img = cv2.imread(img_path)
