@@ -2,7 +2,7 @@ from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge
 from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
 
-def extract_features_single(img_path):
+def extract_features_single(img_path,labeled=False):
     """
     Extracts all features for a single image using the same structure
     as the batch feature generation code.
@@ -10,7 +10,10 @@ def extract_features_single(img_path):
     """
 
     # Extract class label from folder name
-    label = img_path.split("/")[-2]
+    if (labeled):
+        label = img_path.split("/")[-2]
+    else:
+        label="NA"
     img_name = img_path.split("/")[-1]
     img = cv2.imread(img_path)
     if img is None:
