@@ -5,5 +5,5 @@
 
 # features/__init__.py
 from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire, tamura_features
-from .LBP import get_lbps
+from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
