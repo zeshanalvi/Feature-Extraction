@@ -57,6 +57,7 @@ def extract_features_single(img_path,labeled=False,image_data=None):
 
     if image_data is not None:
         img = image_data
+        img_name = img_path
 
         # If torch tensor → convert to numpy
         if hasattr(img, "detach"):
