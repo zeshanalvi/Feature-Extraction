@@ -1,12 +1,46 @@
 from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire, tamura_features, jcd_descriptor, PHOG
 from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
-def extract_features_batch(img_path,labeled=False):
+def extract_features_batch_old(img_path,labeled=False):
     dfs = [] 
     for img in img_path:
         print(img)
         dfs.append(extract_features_single(img_path=img,labeled=labeled))
     return pd.concat(dfs)
+
+def extract_features_batch(img_path, labeled=False):
+    dfs = []
+
+    # If a single tensor or image path was passed, wrap it in a list for uniformity
+    if isinstance(img_path, (torch.Tensor, np.ndarray, str)):
+        img_path = [img_path]
+
+    for img in img_path:
+        # Handle tensor input
+        if isinstance(img, torch.Tensor):
+            img_np = img.detach().cpu().numpy()
+
+            # Convert from (C,H,W) → (H,W,C)
+            if img_np.ndim == 3:
+                img_np = np.transpose(img_np, (1, 2, 0))
+
+            # Scale to uint8 if in [0,1]
+            if img_np.max() <= 1.0:
+                img_np = (img_np * 255).astype(np.uint8)
+
+            # Give a fake name for consistency
+            img_name = "tensor_input"
+
+            dfs.append(extract_features_single(img_path=img_name, labeled=labeled, image_data=img_np))
+
+        # Handle string path input
+        elif isinstance(img, str):
+            dfs.append(extract_features_single(img_path=img, labeled=labeled))
+
+        else:
+            raise TypeError(f"Unsupported input type: {type(img)}")
+
+    return pd.concat(dfs, ignore_index=True)
         
 def extract_features_single(img_path,labeled=False):
     """
