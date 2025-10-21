@@ -60,7 +60,7 @@ def extract_features_single(img_path,labeled=False,img=None):
     else:
         label="NA"
     img_name = img_path.split("/")[-1]
-    if(img==None):
+    if(img is None):
         img = cv2.imread(img_path)
     if img is None:
         raise ValueError(f"Could not read image: {img_path}")
