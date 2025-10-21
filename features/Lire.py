@@ -17,7 +17,7 @@ from .image_read import Dataset
 try:
     from .lbp import get_lbp_single
 except ImportError:
-    from lbp import get_lbp_single
+    from LBP import get_lbp_single
 
 def compute_glcm(img, distances=[1], angles=[0], levels=256):
     h, w = img.shape
