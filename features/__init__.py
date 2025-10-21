@@ -36,7 +36,7 @@ def extract_features_batch(img_path, labeled=False):
             # Give a fake name for consistency
             img_name = "tensor_input"
 
-            print(f"Image type: {type(img_np)}, shape: {getattr(img_np, 'shape', None)}")
+            #print(f"Image type: {type(img_np)}, shape: {getattr(img_np, 'shape', None)}")
             dfs.append(extract_features_single(img_path=img_name, labeled=labeled, image_data=img_np))
 
         # Handle string path input
@@ -165,8 +165,8 @@ def extract_features_single(img_path,labeled=False,image_data=None):
                       index=[img_name])
     df.index.name = "img"
 
-    print(f"Total feature extraction time: {total_time:.4f} s")
-    print(f"FPS: {1/total_time if total_time>0 else 0:.2f}")
+    #print(f"Total feature extraction time: {total_time:.4f} s")
+    #print(f"FPS: {1/total_time if total_time>0 else 0:.2f}")
     df.drop(columns={'0'},axis=1, inplace=True)
     df.rename(columns={'0_4': 'new_col_4', '0_5': 'new_col_5','0_6': 'new_col_6', '0_7': 'new_col_7', '0_8': 'new_col_8'}, inplace=True)
     return df
