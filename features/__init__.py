@@ -36,18 +36,18 @@ def extract_features_batch(img_path, labeled=False):
             # Give a fake name for consistency
             img_name = "tensor_input"
 
-            dfs.append(extract_features_single(img_path=img_name, labeled=labeled))#, image_data=img_np))
+            dfs.append(extract_features_single(img_path=img_name, labeled=labeled, img=img_np))
 
         # Handle string path input
         elif isinstance(img, str):
-            dfs.append(extract_features_single(img_path=img, labeled=labeled))
+            dfs.append(extract_features_single(img_path=img, labeled=labeled,img=None))
 
         else:
             raise TypeError(f"Unsupported input type: {type(img)}")
 
     return pd.concat(dfs, ignore_index=True)
         
-def extract_features_single(img_path,labeled=False):
+def extract_features_single(img_path,labeled=False,img=None):
     """
     Extracts all features for a single image using the same structure
     as the batch feature generation code.
@@ -60,7 +60,8 @@ def extract_features_single(img_path,labeled=False):
     else:
         label="NA"
     img_name = img_path.split("/")[-1]
-    img = cv2.imread(img_path)
+    if(img==None):
+        img = cv2.imread(img_path)
     if img is None:
         raise ValueError(f"Could not read image: {img_path}")
 
