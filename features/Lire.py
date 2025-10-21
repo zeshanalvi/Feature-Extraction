@@ -14,7 +14,7 @@ from skimage.feature import hog
 from skimage import io, color
 import time
 from .image_read import Dataset
-from lbp import get_lbp_single
+from .lbp import get_lbp_single
 
 
 def compute_glcm(img, distances=[1], angles=[0], levels=256):
