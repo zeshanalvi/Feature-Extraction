@@ -4,6 +4,7 @@ from .image_read import Dataset
 def extract_features_batch(img_path,labeled=False):
     dfs = [] 
     for img in img_path:
+        print(img)
         dfs.append(extract_features_single(img_path=img,labeled=labeled))
     return pd.concat(dfs)
         
