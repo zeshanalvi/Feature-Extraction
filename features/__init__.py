@@ -36,7 +36,7 @@ def extract_features_batch(img_path, labeled=False):
             # Give a fake name for consistency
             img_name = "tensor_input"
 
-            print(f"Image type: {type(img_np)}, shape: {getattr(img_np, 'shape', None)}")
+            #print(f"Image type: {type(img_np)}, shape: {getattr(img_np, 'shape', None)}")
             dfs.append(extract_features_single(img_path=img_name, labeled=labeled, image_data=img_np))
 
         # Handle string path input
