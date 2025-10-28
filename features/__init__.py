@@ -17,8 +17,8 @@ def extract_features_batch(img_path, labeled=False):
     dfs = []
 
     # If a single tensor or image path was passed, wrap it in a list for uniformity
-    if isinstance(img_path, (torch.Tensor, np.ndarray, str)):
-        img_path = [img_path]
+    #if isinstance(img_path, (torch.Tensor, np.ndarray, str)):
+    #    img_path = [img_path]
 
     for img in img_path:
         # Handle tensor input
