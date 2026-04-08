@@ -6,8 +6,7 @@ import cv2
 from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire, tamura_features, jcd_descriptor, PHOG, haralick_features, haralick_features14
 from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
-
-from .LireGPU import get_lires as gpu_lires, color_layout as gpu_color_layout, PHOG as gpu_phog, haralick_features as gpu_haralick_features, haralick_features14 as gpu_haralick_features14
+from .LireGPU import gpu_loires
 
 
 def extract_features_batch_old(img_path,labeled=False):
