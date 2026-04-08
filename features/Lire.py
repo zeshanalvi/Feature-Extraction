@@ -19,6 +19,40 @@ import numpy as np
 
 def compute_glcm(img, distances=[1], angles=[0], levels=32):
     img = img.astype(np.uint8)
+
+    # Quantize grayscale to match GLCM levels
+    img = (img.astype(np.float32) * levels / 256).astype(np.int32)
+    img = np.clip(img, 0, levels - 1)
+
+    h, w = img.shape
+    glcm = np.zeros((levels, levels), dtype=np.float64)
+
+    for d in distances:
+        for theta in angles:
+            dx = int(round(d * np.cos(theta)))
+            dy = int(round(d * np.sin(theta)))
+
+            for i in range(h):
+                ni = i + dy
+                if ni < 0 or ni >= h:
+                    continue
+
+                for j in range(w):
+                    nj = j + dx
+                    if nj < 0 or nj >= w:
+                        continue
+
+                    p = img[i, j]
+                    q = img[ni, nj]
+                    glcm[p, q] += 1
+
+    if glcm.sum() > 0:
+        glcm /= glcm.sum()
+
+    return glcm
+
+def compute_glcmp_old2(img, distances=[1], angles=[0], levels=32):
+    img = img.astype(np.uint8)
     h, w = img.shape
     glcm = np.zeros((levels, levels), dtype=np.float64)
 
@@ -536,13 +570,12 @@ def weighted_correlation(glcm):
     return corr
 
 def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
-    
     st = time.time()
     if len(img.shape) == 3:
-        img = (color.rgb2gray(img) * 255).astype(np.uint8)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
         img = img.astype(np.uint8)
-    
+        
     features_list = []
     for theta in angles:
         glcm = compute_glcm(img, distances=distances, angles=[theta], levels=levels)
@@ -568,10 +601,10 @@ def haralick_features14(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi
     st = time.time()
 
     if len(img.shape) == 3:
-        img = (color.rgb2gray(img) * 255).astype(np.uint8)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
         img = img.astype(np.uint8)
-
+        
     eps = 1e-10
     features_list = []
 
