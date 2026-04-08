@@ -241,7 +241,60 @@ def tamura_features1(img, distances=[1], angles=[0]):
 
     return np.array([contrast, homogeneity, energy])
 
+import cv2
+import numpy as np
+import time
+
 def edge_histogram(img, grid=4):
+    """
+    Faster Edge Histogram Descriptor approximation.
+    Output size remains grid * grid * 5.
+    """
+    st = time.time()
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    block_h, block_w = h // grid, w // grid
+
+    # Crop so blocks fit exactly
+    h2 = block_h * grid
+    w2 = block_w * grid
+    gray = gray[:h2, :w2]
+
+    filters = [
+        np.array([[-1,  1], [-1,  1]], dtype=np.float32),  # vertical
+        np.array([[-1, -1], [ 1,  1]], dtype=np.float32),  # horizontal
+        np.array([[ 1, -1], [-1,  1]], dtype=np.float32),  # 45deg
+        np.array([[-1,  1], [ 1, -1]], dtype=np.float32),  # 135deg
+        np.array([[ 1,  1], [ 1,  1]], dtype=np.float32),  # non-directional
+    ]
+
+    edge_hist = np.empty(grid * grid * 5, dtype=np.float32)
+    k = 0
+
+    for f in filters:
+        filtered = cv2.filter2D(gray, cv2.CV_32F, f)
+        binary = (filtered > 0).astype(np.float32)
+
+        # reshape into grid blocks and sum inside each block
+        block_sums = (
+            binary.reshape(grid, block_h, grid, block_w)
+                  .transpose(0, 2, 1, 3)
+                  .sum(axis=(2, 3))
+        )
+
+        vals = block_sums.reshape(-1)
+        edge_hist[k:k + grid * grid] = vals
+        k += grid * grid
+
+    # reorder to match original layout: for each block, 5 filter counts
+    edge_hist = edge_hist.reshape(5, grid * grid).T.reshape(-1)
+
+    edge_hist /= edge_hist.sum() + 1e-8
+    t1 = time.time() - st
+    return edge_hist, t1
+    
+def edge_histogram_slow(img, grid=4):
     """
     Edge Histogram Descriptor (EHD) approximation.
     """
