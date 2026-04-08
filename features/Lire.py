@@ -319,7 +319,7 @@ def PHOG1(img):
     )
     return phog_features
 
-def color_layout(img):
+def color_layout1(img):
     st = time.time()
     # 2. Color Layout Descriptor (approx using mean color of blocks)
     h, w, _ = img.shape
@@ -332,7 +332,117 @@ def color_layout(img):
             color_layout.extend(cv2.mean(block)[:3])  # average BGR
     t1 = time.time()-st
     return np.array(color_layout),t1
-   
+
+
+
+
+import cv2
+import numpy as np
+import time
+
+
+def _zigzag_scan(matrix):
+    """
+    Zig-zag scan of a 2D square matrix.
+    Returns a 1D numpy array.
+    """
+    h, w = matrix.shape
+    result = []
+
+    for s in range(h + w - 1):
+        if s % 2 == 0:
+            # even diagonals: go bottom to top
+            for i in range(min(s, h - 1), max(-1, s - w), -1):
+                j = s - i
+                if 0 <= i < h and 0 <= j < w:
+                    result.append(matrix[i, j])
+        else:
+            # odd diagonals: go top to bottom
+            for j in range(min(s, w - 1), max(-1, s - h), -1):
+                i = s - j
+                if 0 <= i < h and 0 <= j < w:
+                    result.append(matrix[i, j])
+
+    return np.array(result, dtype=np.float32)
+
+
+def _block_average_channel(channel, blocks=8):
+    """
+    Divide one channel into blocks x blocks regions
+    and compute mean of each region.
+    Returns a (blocks, blocks) matrix.
+    """
+    h, w = channel.shape
+
+    # Use linspace so all pixels are covered, even if h or w not divisible by blocks
+    ys = np.linspace(0, h, blocks + 1, dtype=int)
+    xs = np.linspace(0, w, blocks + 1, dtype=int)
+
+    out = np.zeros((blocks, blocks), dtype=np.float32)
+
+    for y in range(blocks):
+        for x in range(blocks):
+            block = channel[ys[y]:ys[y + 1], xs[x]:xs[x + 1]]
+
+            if block.size == 0:
+                out[y, x] = 0.0
+            else:
+                out[y, x] = np.mean(block)
+
+    return out
+
+
+def color_layout(img):
+    st = time.time()
+
+    # Safety checks
+    if img is None:
+        raise ValueError("img is None")
+
+    if len(img.shape) != 3 or img.shape[2] < 3:
+        raise ValueError("img must be a color image with 3 channels")
+
+    # If image has 4 channels, drop alpha
+    if img.shape[2] == 4:
+        img = img[:, :, :3]
+
+    # 1. Convert BGR -> YCrCb
+    # OpenCV uses YCrCb ordering, not YCbCr
+    ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+    Y, Cr, Cb = cv2.split(ycrcb)
+
+    # 2. Build 8x8 representative color blocks for each channel
+    Y_blocks = _block_average_channel(Y, blocks=8)
+    Cr_blocks = _block_average_channel(Cr, blocks=8)
+    Cb_blocks = _block_average_channel(Cb, blocks=8)
+
+    # 3. Apply DCT to each 8x8 block-average matrix
+    Y_dct = cv2.dct(Y_blocks)
+    Cr_dct = cv2.dct(Cr_blocks)
+    Cb_dct = cv2.dct(Cb_blocks)
+
+    # 4. Zig-zag scan
+    Y_zigzag = _zigzag_scan(Y_dct)
+    Cr_zigzag = _zigzag_scan(Cr_dct)
+    Cb_zigzag = _zigzag_scan(Cb_dct)
+
+    # 5. Keep low-frequency coefficients
+    # Total = 21 + 6 + 6 = 33 features
+    nY = 21
+    nCr = 6
+    nCb = 6
+
+    features = np.concatenate([
+        Y_zigzag[:nY],
+        Cr_zigzag[:nCr],
+        Cb_zigzag[:nCb]
+    ]).astype(np.float32)
+
+    t1 = time.time() - st
+    return features, t1
+
+
+
 def weighted_correlation(glcm):
     levels = glcm.shape[0]
     i, j = np.indices(glcm.shape)
@@ -344,6 +454,8 @@ def weighted_correlation(glcm):
     return corr
 
 def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=256):
+    
+    st = time.time()
     if len(img.shape) == 3:
         img = (color.rgb2gray(img) * 255).astype(np.uint8)
     else:
@@ -363,8 +475,101 @@ def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4
 
         features_list.append([contrast, energy, homogeneity, correlation, entropy, dissimilarity])
     
-    return np.mean(features_list, axis=0)
+    return np.mean(features_list, axis=0), time.time() - st
+import numpy as np
+import time
+from skimage import color
 
+
+def haralick_features14(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=256):
+    
+    st = time.time()
+
+    if len(img.shape) == 3:
+        img = (color.rgb2gray(img) * 255).astype(np.uint8)
+    else:
+        img = img.astype(np.uint8)
+
+    eps = 1e-10
+    features_list = []
+
+    for theta in angles:
+        glcm = compute_glcm(img, distances=distances, angles=[theta], levels=levels)
+        P = glcm.astype(np.float64)
+        P /= (P.sum() + eps)  # normalize
+
+        Ng = P.shape[0]
+        i, j = np.indices(P.shape)
+
+        # Marginals
+        px = np.sum(P, axis=1)
+        py = np.sum(P, axis=0)
+
+        ux = np.sum(i * P)
+        uy = np.sum(j * P)
+
+        sigx = np.sqrt(np.sum((i - ux) ** 2 * P))
+        sigy = np.sqrt(np.sum((j - uy) ** 2 * P))
+
+        # Basic features
+        asm = np.sum(P ** 2)
+        contrast = np.sum((i - j) ** 2 * P)
+        correlation = np.sum((i - ux) * (j - uy) * P) / (sigx * sigy + eps)
+        variance = np.sum((i - ux) ** 2 * P)
+        homogeneity = np.sum(P / (1 + (i - j) ** 2))
+        entropy = -np.sum(P * np.log(P + eps))
+
+        # Sum and difference distributions
+        p_sum = np.zeros(2 * Ng)
+        p_diff = np.zeros(Ng)
+
+        for x in range(Ng):
+            for y in range(Ng):
+                p_sum[x + y] += P[x, y]
+                p_diff[abs(x - y)] += P[x, y]
+
+        # Sum features
+        sum_avg = np.sum(np.arange(2 * Ng) * p_sum)
+        sum_entropy = -np.sum(p_sum * np.log(p_sum + eps))
+        sum_var = np.sum(((np.arange(2 * Ng) - sum_entropy) ** 2) * p_sum)
+
+        # Difference features
+        diff_var = np.var(p_diff)
+        diff_entropy = -np.sum(p_diff * np.log(p_diff + eps))
+
+        # Info measures
+        HX = -np.sum(px * np.log(px + eps))
+        HY = -np.sum(py * np.log(py + eps))
+        HXY = entropy
+        HXY1 = -np.sum(P * np.log(px[:, None] * py[None, :] + eps))
+        HXY2 = -np.sum(px[:, None] * py[None, :] * np.log(px[:, None] * py[None, :] + eps))
+
+        imc1 = (HXY - HXY1) / (max(HX, HY) + eps)
+        imc2 = np.sqrt(1 - np.exp(-2 * (HXY2 - HXY)))
+
+        max_prob = np.max(P)
+
+        features = [
+            asm,
+            contrast,
+            correlation,
+            variance,
+            homogeneity,
+            sum_avg,
+            sum_var,
+            sum_entropy,
+            entropy,
+            diff_var,
+            diff_entropy,
+            imc1,
+            imc2,
+            max_prob
+        ]
+
+        features_list.append(features)
+
+    return np.mean(features_list, axis=0), time.time() - st
+    
 def extract_lire(image_path):
     img = cv2.imread(image_path)
     #img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -400,7 +605,7 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
   total_time=0
 
 
-  ary=np.zeros((len(paths),49),dtype=object)
+  ary=np.zeros((len(paths),34),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
      ary[i,1:],t1=color_layout(cv2.imread(paths[i]))
@@ -447,4 +652,21 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
   print("FPS for phog is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),7),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1:],t1=haralick_features(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_6.csv",index=True)
+  print("FPS for haralick_6 is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),15),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1:],t1=haralick_features14(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_14.csv",index=True)
+  print("FPS for haralick_14 is",len(paths)/total_time)
+      
 
