@@ -403,7 +403,7 @@ def jcd_descriptor1(img):
 
     return color_hist #np.concatenate([color_hist, edge_feat, texture_feat])
 
-def PHOG(img, bins=14, levels=5):
+def PHOG_slow(img, bins=14, levels=5):
     st = time.time()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     phog_vec = []
@@ -422,6 +422,69 @@ def PHOG(img, bins=14, levels=5):
     t1 = time.time()-st
     return np.array(phog_vec[:630]),t1
 
+import cv2
+import numpy as np
+import time
+
+def PHOG(img, bins=14, levels=5):
+    st = time.time()
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # gradients once for full image
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+
+    mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=False)
+    ang = np.mod(ang, np.pi)  # unsigned orientations [0, pi)
+
+    # quantize orientation
+    bin_idx = np.floor(ang * bins / np.pi).astype(np.int32)
+    bin_idx = np.clip(bin_idx, 0, bins - 1)
+
+    h, w = gray.shape
+    feats = []
+
+    for l in range(levels):
+        n_cells = 2 ** l
+
+        ys = np.linspace(0, h, n_cells + 1, dtype=int)
+        xs = np.linspace(0, w, n_cells + 1, dtype=int)
+
+        for i in range(n_cells):
+            y0, y1 = ys[i], ys[i + 1]
+            for j in range(n_cells):
+                x0, x1 = xs[j], xs[j + 1]
+
+                patch_bins = bin_idx[y0:y1, x0:x1]
+                patch_mag = mag[y0:y1, x0:x1]
+
+                if patch_bins.size == 0:
+                    hist = np.zeros(bins, dtype=np.float32)
+                else:
+                    hist = np.bincount(
+                        patch_bins.ravel(),
+                        weights=patch_mag.ravel(),
+                        minlength=bins
+                    ).astype(np.float32)
+
+                    s = hist.sum()
+                    if s > 0:
+                        hist /= s
+
+                feats.extend(hist)
+
+    feats = np.asarray(feats, dtype=np.float32)
+
+    # match your expected size
+    target = 630
+    if feats.size >= target:
+        feats = feats[:target]
+    else:
+        feats = np.pad(feats, (0, target - feats.size))
+
+    return feats, time.time() - st
+    
 def PHOG1(img):
    # -------------------- SHAPE FEATURES --------------------
     # 5. PHOG (via HOG)
