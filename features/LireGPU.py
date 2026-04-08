@@ -624,7 +624,7 @@ def _write_descriptor_csv(storage_path, filename, pindex, rows):
     df.to_csv(os.path.join(storage_path, filename), index=True)
 
 
-def get_lires(dataset=None, paths=None, label=None, storage_path=None, batch_size=1000):
+def gpu_lires(dataset=None, paths=None, label=None, storage_path=None, batch_size=1000):
     if paths is None or len(paths) == 0:
         raise ValueError("paths must be a non-empty list")
     if storage_path is None:
