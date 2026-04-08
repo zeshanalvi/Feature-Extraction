@@ -15,8 +15,37 @@ from skimage import io, color
 import time
 from .image_read import Dataset
 
+import numpy as np
 
 def compute_glcm(img, distances=[1], angles=[0], levels=32):
+    img = img.astype(np.uint8)
+    h, w = img.shape
+    glcm = np.zeros((levels, levels), dtype=np.float64)
+
+    for d in distances:
+        for theta in angles:
+            dx = int(round(d * np.cos(theta)))
+            dy = int(round(d * np.sin(theta)))
+
+            for i in range(h):
+                ni = i + dy
+                if ni < 0 or ni >= h:
+                    continue
+
+                for j in range(w):
+                    nj = j + dx
+                    if nj < 0 or nj >= w:
+                        continue
+
+                    p = img[i, j]
+                    q = img[ni, nj]
+                    glcm[p, q] += 1
+
+    if glcm.sum() > 0:
+        glcm /= glcm.sum()
+
+    return glcm
+def compute_glcm_old(img, distances=[1], angles=[0], levels=32):
     h, w = img.shape
     glcm = np.zeros((levels, levels), dtype=np.uint32)
 
