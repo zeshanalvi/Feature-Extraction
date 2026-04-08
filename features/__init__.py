@@ -7,6 +7,8 @@ from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge
 from .LBP import get_lbps, get_lbp_single
 from .image_read import Dataset
 from .LireGPU import gpu_lires
+from .LireGPU import PHOG as PHOG_gpu, haralick_features as haralick_gpu
+from .LireGPU import color_layout as color_layout_gpu, haralick_features14 as haralick14_gpu
 
 
 def extract_features_batch_old(img_path,labeled=False):
