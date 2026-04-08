@@ -1,0 +1,858 @@
+import cv2, numpy as np, os
+import pandas as pd
+from skimage import feature
+import warnings
+warnings.filterwarnings('ignore')
+
+#from skimage.feature import greycomatrix, greycoprops
+#from skimage.feature.texture import greycomatrix, greycoprops
+
+from skimage.feature import hog
+from skimage.color import rgb2gray
+#import mahotas
+from skimage.feature import hog
+from skimage import io, color
+import time
+from .image_read import Dataset
+
+import numpy as np
+
+def compute_glcm(img, distances=[1], angles=[0], levels=32):
+    img = img.astype(np.uint8)
+
+    # Quantize grayscale to match GLCM levels
+    img = (img.astype(np.float32) * levels / 256).astype(np.int32)
+    img = np.clip(img, 0, levels - 1)
+
+    h, w = img.shape
+    glcm = np.zeros((levels, levels), dtype=np.float64)
+
+    for d in distances:
+        for theta in angles:
+            dx = int(round(d * np.cos(theta)))
+            dy = int(round(d * np.sin(theta)))
+
+            for i in range(h):
+                ni = i + dy
+                if ni < 0 or ni >= h:
+                    continue
+
+                for j in range(w):
+                    nj = j + dx
+                    if nj < 0 or nj >= w:
+                        continue
+
+                    p = img[i, j]
+                    q = img[ni, nj]
+                    glcm[p, q] += 1
+
+    if glcm.sum() > 0:
+        glcm /= glcm.sum()
+
+    return glcm
+
+def compute_glcmp_old2(img, distances=[1], angles=[0], levels=32):
+    img = img.astype(np.uint8)
+    h, w = img.shape
+    glcm = np.zeros((levels, levels), dtype=np.float64)
+
+    for d in distances:
+        for theta in angles:
+            dx = int(round(d * np.cos(theta)))
+            dy = int(round(d * np.sin(theta)))
+
+            for i in range(h):
+                ni = i + dy
+                if ni < 0 or ni >= h:
+                    continue
+
+                for j in range(w):
+                    nj = j + dx
+                    if nj < 0 or nj >= w:
+                        continue
+
+                    p = img[i, j]
+                    q = img[ni, nj]
+                    glcm[p, q] += 1
+
+    if glcm.sum() > 0:
+        glcm /= glcm.sum()
+
+    return glcm
+def compute_glcm_old(img, distances=[1], angles=[0], levels=32):
+    h, w = img.shape
+    glcm = np.zeros((levels, levels), dtype=np.uint32)
+
+    for d in distances:
+        for theta in angles:
+            dx, dy = int(np.round(np.cos(theta))), int(np.round(np.sin(theta)))
+            for i in range(h - dy):
+                for j in range(w - dx):
+                    p = img[i, j]
+                    q = img[i + dy, j + dx]
+                    glcm[p, q] += 1
+    return glcm
+
+def quantize_image(img, bins_per_channel=8):
+    """Reduce colors to a smaller palette."""
+    bins = np.linspace(0, 256, bins_per_channel+1, dtype=np.int32)
+    quantized = np.digitize(img, bins) - 1
+    return quantized
+
+import cv2
+import numpy as np
+
+def color_correlogram(img, bins=32, distances=32):
+    """
+    Extracts a color correlogram of size bins*distances (default: 1024).
+    
+    Args:
+        img: input BGR image (OpenCV format)
+        bins: number of quantized colors (default 32)
+        distances: number of distances (default 32)
+
+    Returns:
+        feature vector of shape (bins * distances,) e.g. (1024,)
+    """
+    # Resize for consistency
+    img_small = cv2.resize(img, (64, 64))
+
+    # Quantize colors into bins using HSV (better for color perception)
+    st = time.time()
+    hsv = cv2.cvtColor(img_small, cv2.COLOR_BGR2HSV)
+    h_bins, s_bins, v_bins = 4, 4, 2  # 4*4*2 = 32 bins
+    quant = np.floor_divide(hsv[..., 0], 180 // h_bins) * (s_bins * v_bins) \
+            + np.floor_divide(hsv[..., 1], 256 // s_bins) * v_bins \
+            + np.floor_divide(hsv[..., 2], 256 // v_bins)
+    idx = quant.astype(int)
+
+    h, w = idx.shape
+    features = []
+
+    # For each distance d
+    for d in range(1, distances+1):
+        correlogram = np.zeros(bins, dtype=np.float32)
+        count = np.zeros(bins, dtype=np.float32)
+
+        for y in range(h):
+            for x in range(w):
+                color = idx[y, x]
+                # Check right neighbor
+                if x+d < w:
+                    if idx[y, x+d] == color:
+                        correlogram[color] += 1
+                # Check down neighbor
+                if y+d < h:
+                    if idx[y+d, x] == color:
+                        correlogram[color] += 1
+                count[color] += 2  # two checks per pixel
+
+        correlogram = correlogram / (count + 1e-6)  # normalize per color
+        features.extend(correlogram)
+
+    t1 = time.time()-st
+    return np.array(features), t1  # (1024,)
+
+
+def color_correlogram3(img, bins=32, distances=32):
+    img_small = cv2.resize(img, (64, 64))
+    quant = np.floor_divide(img_small, 256 // (bins // 3))
+    idx = quant[..., 0]*(bins//3)**2 + quant[..., 1]*(bins//3) + quant[..., 2]
+
+    h, w = idx.shape
+    features = []
+    for d in range(1, distances+1):  # 32 distances
+        correlogram = np.zeros(bins)
+        for y in range(h):
+            for x in range(w):
+                color = idx[y, x]
+                if y+d < h and idx[y+d, x] == color: correlogram[color]+=1
+                if x+d < w and idx[y, x+d] == color: correlogram[color]+=1
+        features.extend(correlogram)
+    return np.array(features)  # (1024,)
+#def color_correlogram1(img, distances=[1, 3, 5], bins_per_channel=8):
+
+def color_correlogram1(img, distances=[32], bins_per_channel=32):
+    """
+    Compute Color Correlogram of an image.
+    
+    Parameters:
+    - img: BGR image
+    - distances: list of pixel distances
+    - bins_per_channel: quantization of colors
+    
+    Returns:
+    - correlogram: flattened numpy array
+    """
+    h, w, c = img.shape
+    q_img = quantize_image(img, bins_per_channel)
+    num_colors = bins_per_channel ** 3
+    correlogram = np.zeros((len(distances), num_colors))
+
+    # Convert each pixel color to a single index
+    color_idx = (q_img[:,:,0] * bins_per_channel * bins_per_channel +
+                 q_img[:,:,1] * bins_per_channel +
+                 q_img[:,:,2])
+
+    coords = np.array([(y, x) for y in range(h) for x in range(w)])
+
+    for d_index, d in enumerate(distances):
+        for y, x in coords:
+            center_color = color_idx[y, x]
+            
+            # 8 neighbors at distance d
+            neighbors = [
+                (y-d, x), (y+d, x), (y, x-d), (y, x+d),
+                (y-d, x-d), (y-d, x+d), (y+d, x-d), (y+d, x+d)
+            ]
+            for ny, nx in neighbors:
+                if 0 <= ny < h and 0 <= nx < w:
+                    neigh_color = color_idx[ny, nx]
+                    correlogram[d_index, center_color] += (center_color == neigh_color)
+
+    # Normalize
+    correlogram /= correlogram.sum(axis=1, keepdims=True) + 1e-8
+    return correlogram.flatten()
+
+def tamura_features(img, blocks=6):
+    st = time.time()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    fh, fw = h // blocks, w // blocks
+
+    feats = []
+    for i in range(3):  # 3 regions vertically
+        for j in range(2):  # 2 regions horizontally = 6 patches
+            patch = gray[i*fh:(i+1)*fh, j*fw:(j+1)*fw]
+            var = np.var(patch)
+            contrast = patch.std()
+            gx = cv2.Sobel(patch, cv2.CV_32F, 1, 0)
+            gy = cv2.Sobel(patch, cv2.CV_32F, 0, 1)
+            ang = np.arctan2(gy, gx).mean()
+            feats.extend([var, contrast, ang])
+    t1 = time.time()-st
+    return np.array(feats),t1  # (18,)
+
+def tamura_features2(img, distances=[1], angles=[0], levels=256):
+    """
+    Compute basic Tamura features: contrast, energy, homogeneity (from GLCM)
+    img: grayscale image (0-255)
+    """
+    # Ensure grayscale
+    if len(img.shape) == 3:
+        img = (color.rgb2gray(img) * 255).astype(np.uint8)
+    else:
+        img = img.astype(np.uint8)
+    
+    glcm = compute_glcm(img, distances=distances, angles=angles, levels=levels)
+
+    # Contrast
+    i, j = np.indices(glcm.shape)
+    contrast = np.sum(glcm * (i - j)**2)
+
+    # Energy (angular second moment)
+    energy = np.sum(glcm**2)
+
+    # Homogeneity (inverse difference moment)
+    homogeneity = np.sum(glcm / (1.0 + np.abs(i - j)))
+
+    return {
+        "contrast": contrast,
+        "energy": energy,
+        "homogeneity": homogeneity
+    }
+
+def tamura_features1(img, distances=[1], angles=[0]):
+    """
+    Approximate Tamura texture features using GLCM (coarseness, contrast, directionality).
+    """
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    glcm=compute_glcm(gray)
+    #glcm = greycomatrix(gray, distances=distances, angles=angles, symmetric=True, normed=True)
+    contrast = greycoprops(glcm, 'contrast').flatten()[0]
+    homogeneity = greycoprops(glcm, 'homogeneity').flatten()[0]
+    energy = greycoprops(glcm, 'energy').flatten()[0]
+
+    return np.array([contrast, homogeneity, energy])
+
+import cv2
+import numpy as np
+import time
+
+def edge_histogram(img, grid=4):
+    """
+    Faster Edge Histogram Descriptor approximation.
+    Output size remains grid * grid * 5.
+    """
+    st = time.time()
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    block_h, block_w = h // grid, w // grid
+
+    # Crop so blocks fit exactly
+    h2 = block_h * grid
+    w2 = block_w * grid
+    gray = gray[:h2, :w2]
+
+    filters = [
+        np.array([[-1,  1], [-1,  1]], dtype=np.float32),  # vertical
+        np.array([[-1, -1], [ 1,  1]], dtype=np.float32),  # horizontal
+        np.array([[ 1, -1], [-1,  1]], dtype=np.float32),  # 45deg
+        np.array([[-1,  1], [ 1, -1]], dtype=np.float32),  # 135deg
+        np.array([[ 1,  1], [ 1,  1]], dtype=np.float32),  # non-directional
+    ]
+
+    edge_hist = np.empty(grid * grid * 5, dtype=np.float32)
+    k = 0
+
+    for f in filters:
+        filtered = cv2.filter2D(gray, cv2.CV_32F, f)
+        binary = (filtered > 0).astype(np.float32)
+
+        # reshape into grid blocks and sum inside each block
+        block_sums = (
+            binary.reshape(grid, block_h, grid, block_w)
+                  .transpose(0, 2, 1, 3)
+                  .sum(axis=(2, 3))
+        )
+
+        vals = block_sums.reshape(-1)
+        edge_hist[k:k + grid * grid] = vals
+        k += grid * grid
+
+    # reorder to match original layout: for each block, 5 filter counts
+    edge_hist = edge_hist.reshape(5, grid * grid).T.reshape(-1)
+
+    edge_hist /= edge_hist.sum() + 1e-8
+    t1 = time.time() - st
+    return edge_hist, t1
+    
+def edge_histogram_slow(img, grid=4):
+    """
+    Edge Histogram Descriptor (EHD) approximation.
+    """
+    st = time.time()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    block_h, block_w = h // grid, w // grid
+
+    edge_hist = []
+
+    # Edge filters
+    filters = {
+        "vertical": np.array([[-1, 1], [-1, 1]]),
+        "horizontal": np.array([[-1, -1], [1, 1]]),
+        "45deg": np.array([[1, -1], [-1, 1]]),
+        "135deg": np.array([[-1, 1], [1, -1]]),
+        "non-directional": np.array([[1, 1], [1, 1]])
+    }
+
+    for gy in range(grid):
+        for gx in range(grid):
+            block = gray[gy*block_h:(gy+1)*block_h, gx*block_w:(gx+1)*block_w]
+            block_hist = []
+            for f in filters.values():
+                filtered = cv2.filter2D(block, -1, f)
+                block_hist.append(np.sum(filtered > 0))
+            edge_hist.extend(block_hist)
+
+    edge_hist = np.array(edge_hist, dtype=np.float32)
+    edge_hist /= edge_hist.sum() + 1e-8
+    t1 = time.time()-st
+    return edge_hist,t1
+
+def jcd_descriptor(img, color_bins=64, edge_bins=272):
+    # Resize for consistency
+    img_resized = cv2.resize(img, (128, 128))
+    st = time.time()
+    # ---- Color Histogram part ----
+    hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1, 2], None, [4, 4, 4], [0, 180, 0, 256, 0, 256])
+    hist = cv2.normalize(hist, hist).flatten()  # 64 bins
+
+    # ---- Edge Histogram part ----
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=True)
+    bins = np.int32(ang / 360 * edge_bins) % edge_bins
+    edge_hist, _ = np.histogram(bins, bins=edge_bins, range=(0, edge_bins))
+    edge_hist = edge_hist.astype("float32")
+    edge_hist /= (edge_hist.sum() + 1e-6)
+
+    t1 = time.time()-st
+    # Concatenate → 64 + 274 = 338
+    return np.hstack([hist, edge_hist]),t1
+
+def jcd_descriptor1(img):
+    """
+    Approximation of JCD (Joint Composite Descriptor).
+    Combines color histogram + edge histogram + Tamura.
+    """
+    # Color histogram
+    hist_b = cv2.calcHist([img], [0], None, [32], [0, 256])
+    hist_g = cv2.calcHist([img], [1], None, [32], [0, 256])
+    hist_r = cv2.calcHist([img], [2], None, [32], [0, 256])
+    color_hist = np.concatenate([hist_b, hist_g, hist_r]).flatten()
+
+    # Combine with edge and texture
+    edge_feat = edge_histogram(img)
+    texture_feat = tamura_features(img)
+    print(color_hist.shape, edge_feat.shape, texture_feat['contrast'])
+
+    return color_hist #np.concatenate([color_hist, edge_feat, texture_feat])
+
+def PHOG_slow(img, bins=14, levels=5):
+    st = time.time()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    phog_vec = []
+    h, w = gray.shape
+
+    for l in range(levels):
+        step_y, step_x = h // (2**l), w // (2**l)
+        for i in range(2**l):
+            for j in range(2**l):
+                patch = gray[i*step_y:(i+1)*step_y, j*step_x:(j+1)*step_x]
+                if patch.size > 0:
+                    feat = hog(patch, orientations=bins,
+                               pixels_per_cell=(8,8), cells_per_block=(1,1),
+                               feature_vector=True)
+                    phog_vec.extend(feat[:bins])  
+    t1 = time.time()-st
+    return np.array(phog_vec[:630]),t1
+
+import cv2
+import numpy as np
+import time
+
+def PHOG(img, bins=14, levels=5):
+    st = time.time()
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # gradients once for full image
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+
+    mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=False)
+    ang = np.mod(ang, np.pi)  # unsigned orientations [0, pi)
+
+    # quantize orientation
+    bin_idx = np.floor(ang * bins / np.pi).astype(np.int32)
+    bin_idx = np.clip(bin_idx, 0, bins - 1)
+
+    h, w = gray.shape
+    feats = []
+
+    for l in range(levels):
+        n_cells = 2 ** l
+
+        ys = np.linspace(0, h, n_cells + 1, dtype=int)
+        xs = np.linspace(0, w, n_cells + 1, dtype=int)
+
+        for i in range(n_cells):
+            y0, y1 = ys[i], ys[i + 1]
+            for j in range(n_cells):
+                x0, x1 = xs[j], xs[j + 1]
+
+                patch_bins = bin_idx[y0:y1, x0:x1]
+                patch_mag = mag[y0:y1, x0:x1]
+
+                if patch_bins.size == 0:
+                    hist = np.zeros(bins, dtype=np.float32)
+                else:
+                    hist = np.bincount(
+                        patch_bins.ravel(),
+                        weights=patch_mag.ravel(),
+                        minlength=bins
+                    ).astype(np.float32)
+
+                    s = hist.sum()
+                    if s > 0:
+                        hist /= s
+
+                feats.extend(hist)
+
+    feats = np.asarray(feats, dtype=np.float32)
+
+    # match your expected size
+    target = 630
+    if feats.size >= target:
+        feats = feats[:target]
+    else:
+        feats = np.pad(feats, (0, target - feats.size))
+
+    return feats, time.time() - st
+    
+def PHOG1(img):
+   # -------------------- SHAPE FEATURES --------------------
+    # 5. PHOG (via HOG)
+    phog_features, _ = hog(
+        rgb2gray(img),
+        pixels_per_cell=(16,16),
+        cells_per_block=(2,2),
+        orientations=9,
+        visualize=True,
+        block_norm="L2-Hys"
+    )
+    return phog_features
+
+def color_layout1(img):
+    st = time.time()
+    # 2. Color Layout Descriptor (approx using mean color of blocks)
+    h, w, _ = img.shape
+    blocks = 4
+    block_h, block_w = h // blocks, w // blocks
+    color_layout = []
+    for y in range(blocks):
+        for x in range(blocks):
+            block = img[y*block_h:(y+1)*block_h, x*block_w:(x+1)*block_w]
+            color_layout.extend(cv2.mean(block)[:3])  # average BGR
+    t1 = time.time()-st
+    return np.array(color_layout),t1
+
+
+
+
+import cv2
+import numpy as np
+import time
+
+
+def _zigzag_scan(matrix):
+    """
+    Zig-zag scan of a 2D square matrix.
+    Returns a 1D numpy array.
+    """
+    h, w = matrix.shape
+    result = []
+
+    for s in range(h + w - 1):
+        if s % 2 == 0:
+            # even diagonals: go bottom to top
+            for i in range(min(s, h - 1), max(-1, s - w), -1):
+                j = s - i
+                if 0 <= i < h and 0 <= j < w:
+                    result.append(matrix[i, j])
+        else:
+            # odd diagonals: go top to bottom
+            for j in range(min(s, w - 1), max(-1, s - h), -1):
+                i = s - j
+                if 0 <= i < h and 0 <= j < w:
+                    result.append(matrix[i, j])
+
+    return np.array(result, dtype=np.float32)
+
+
+def _block_average_channel(channel, blocks=8):
+    """
+    Divide one channel into blocks x blocks regions
+    and compute mean of each region.
+    Returns a (blocks, blocks) matrix.
+    """
+    h, w = channel.shape
+
+    # Use linspace so all pixels are covered, even if h or w not divisible by blocks
+    ys = np.linspace(0, h, blocks + 1, dtype=int)
+    xs = np.linspace(0, w, blocks + 1, dtype=int)
+
+    out = np.zeros((blocks, blocks), dtype=np.float32)
+
+    for y in range(blocks):
+        for x in range(blocks):
+            block = channel[ys[y]:ys[y + 1], xs[x]:xs[x + 1]]
+
+            if block.size == 0:
+                out[y, x] = 0.0
+            else:
+                out[y, x] = np.mean(block)
+
+    return out
+
+
+def color_layout(img):
+    st = time.time()
+
+    # Safety checks
+    if img is None:
+        raise ValueError("img is None")
+
+    if len(img.shape) != 3 or img.shape[2] < 3:
+        raise ValueError("img must be a color image with 3 channels")
+
+    # If image has 4 channels, drop alpha
+    if img.shape[2] == 4:
+        img = img[:, :, :3]
+
+    # 1. Convert BGR -> YCrCb
+    # OpenCV uses YCrCb ordering, not YCbCr
+    ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+    Y, Cr, Cb = cv2.split(ycrcb)
+
+    # 2. Build 8x8 representative color blocks for each channel
+    Y_blocks = _block_average_channel(Y, blocks=8)
+    Cr_blocks = _block_average_channel(Cr, blocks=8)
+    Cb_blocks = _block_average_channel(Cb, blocks=8)
+
+    # 3. Apply DCT to each 8x8 block-average matrix
+    Y_dct = cv2.dct(Y_blocks)
+    Cr_dct = cv2.dct(Cr_blocks)
+    Cb_dct = cv2.dct(Cb_blocks)
+
+    # 4. Zig-zag scan
+    Y_zigzag = _zigzag_scan(Y_dct)
+    Cr_zigzag = _zigzag_scan(Cr_dct)
+    Cb_zigzag = _zigzag_scan(Cb_dct)
+
+    # 5. Keep low-frequency coefficients
+    # Total = 21 + 6 + 6 = 33 features
+    nY = 21
+    nCr = 6
+    nCb = 6
+
+    features = np.concatenate([
+        Y_zigzag[:nY],
+        Cr_zigzag[:nCr],
+        Cb_zigzag[:nCb]
+    ]).astype(np.float32)
+
+    t1 = time.time() - st
+    return features, t1
+
+
+
+def weighted_correlation(glcm):
+    levels = glcm.shape[0]
+    i, j = np.indices(glcm.shape)
+    mean_i = np.sum(i * glcm)
+    mean_j = np.sum(j * glcm)
+    std_i = np.sqrt(np.sum(glcm * (i - mean_i) ** 2))
+    std_j = np.sqrt(np.sum(glcm * (j - mean_j) ** 2))
+    corr = np.sum(glcm * (i - mean_i) * (j - mean_j)) / (std_i * std_j + 1e-10)
+    return corr
+
+def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
+    st = time.time()
+    if len(img.shape) == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        img = img.astype(np.uint8)
+        
+    features_list = []
+    for theta in angles:
+        glcm = compute_glcm(img, distances=distances, angles=[theta], levels=levels)
+        i, j = np.indices(glcm.shape)
+
+        contrast = np.sum(glcm * (i - j) ** 2)
+        energy = np.sum(glcm ** 2)
+        homogeneity = np.sum(glcm / (1.0 + np.abs(i - j)))
+        correlation = weighted_correlation(glcm)
+        entropy = -np.sum(glcm * np.log(glcm + 1e-10))
+        dissimilarity = np.sum(glcm * np.abs(i - j))
+
+        features_list.append([contrast, energy, homogeneity, correlation, entropy, dissimilarity])
+    
+    return np.mean(features_list, axis=0), time.time() - st
+import numpy as np
+import time
+from skimage import color
+
+
+def haralick_features14(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
+    
+    st = time.time()
+
+    if len(img.shape) == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        img = img.astype(np.uint8)
+        
+    eps = 1e-10
+    features_list = []
+
+    for theta in angles:
+        glcm = compute_glcm(img, distances=distances, angles=[theta], levels=levels)
+        P = glcm.astype(np.float64)
+        P /= (P.sum() + eps)  # normalize
+
+        Ng = P.shape[0]
+        i, j = np.indices(P.shape)
+
+        # Marginals
+        px = np.sum(P, axis=1)
+        py = np.sum(P, axis=0)
+
+        ux = np.sum(i * P)
+        uy = np.sum(j * P)
+
+        sigx = np.sqrt(np.sum((i - ux) ** 2 * P))
+        sigy = np.sqrt(np.sum((j - uy) ** 2 * P))
+
+        # Basic features
+        asm = np.sum(P ** 2)
+        contrast = np.sum((i - j) ** 2 * P)
+        correlation = np.sum((i - ux) * (j - uy) * P) / (sigx * sigy + eps)
+        variance = np.sum((i - ux) ** 2 * P)
+        homogeneity = np.sum(P / (1 + (i - j) ** 2))
+        entropy = -np.sum(P * np.log(P + eps))
+
+        # Sum and difference distributions
+        p_sum = np.zeros(2 * Ng)
+        p_diff = np.zeros(Ng)
+
+        for x in range(Ng):
+            for y in range(Ng):
+                p_sum[x + y] += P[x, y]
+                p_diff[abs(x - y)] += P[x, y]
+
+        # Sum features
+        sum_avg = np.sum(np.arange(2 * Ng) * p_sum)
+        sum_entropy = -np.sum(p_sum * np.log(p_sum + eps))
+        sum_var = np.sum(((np.arange(2 * Ng) - sum_entropy) ** 2) * p_sum)
+
+        # Difference features
+        diff_var = np.var(p_diff)
+        diff_entropy = -np.sum(p_diff * np.log(p_diff + eps))
+
+        # Info measures
+        HX = -np.sum(px * np.log(px + eps))
+        HY = -np.sum(py * np.log(py + eps))
+        HXY = entropy
+        HXY1 = -np.sum(P * np.log(px[:, None] * py[None, :] + eps))
+        HXY2 = -np.sum(px[:, None] * py[None, :] * np.log(px[:, None] * py[None, :] + eps))
+
+        imc1 = (HXY - HXY1) / (max(HX, HY) + eps)
+        imc2 = np.sqrt(1 - np.exp(-2 * (HXY2 - HXY)))
+
+        max_prob = np.max(P)
+
+        features = [
+            asm,
+            contrast,
+            correlation,
+            variance,
+            homogeneity,
+            sum_avg,
+            sum_var,
+            sum_entropy,
+            entropy,
+            diff_var,
+            diff_entropy,
+            imc1,
+            imc2,
+            max_prob
+        ]
+
+        features_list.append(features)
+
+    return np.mean(features_list, axis=0), time.time() - st
+    
+def extract_lire(image_path):
+    img = cv2.imread(image_path)
+    #img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    features = {}
+    # -------------------- COLOR FEATURES --------------------
+    # 1. Color Histogram
+    #hist = cv2.calcHist([img], [0, 1, 2], None, [8, 8, 8], [0,256, 0,256, 0,256])
+    #hist = cv2.normalize(hist, hist).flatten()
+    #features['color_histogram'] = hist
+
+    features['color_layout'] = color_layout(img)
+
+    # -------------------- TEXTURE FEATURES --------------------
+    # 3. Haralick features (Tamura alternative)
+    #features['haralick'] = haralick_features(img_gray)
+
+    # 4. Local Binary Pattern (LBP)
+    #lbp = mahotas.features.lbp(img_gray, radius=2, points=16)
+    #features['lbp'] = lbp
+
+    
+    features['phog'] = PHOG(img)
+    features['color_correlogram']=color_correlogram(img)
+    features['tamura']=tamura_features(img)
+    features['edge_histogram']=edge_histogram(img)
+    features['jcd']=jcd_descriptor(img)
+
+    return features
+
+def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
+  #paths,label,labels=gather_paths_all(jpg_path=data_path,num_classes=num_classes)  
+  pindex=[p.split("/")[-1] for p in paths]
+  total_time=0
+
+
+  ary=np.zeros((len(paths),35),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=color_layout(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_layout.csv",index=True)
+  print("FPS for color_layout is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),1026),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=color_correlogram(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_correlogram.csv",index=True)
+  print("FPS for color_correlogram is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),20),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=tamura_features(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"tamura_features.csv",index=True)
+  print("FPS for tamura_features is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),82),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=edge_histogram(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"edge_histogram.csv",index=True)
+  print("FPS for edge_histogram is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),338),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=jcd_descriptor(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"jcd_descriptor.csv",index=True)
+  print("FPS for jcd_descriptor is",len(paths)/total_time)
+
+  ary=np.zeros((len(paths),632),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=PHOG(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
+  print("FPS for phog is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),8),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=haralick_features(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_6.csv",index=True)
+  print("FPS for haralick_6 is",len(paths)/total_time)
+  
+  ary=np.zeros((len(paths),16),dtype=object)
+  for i,p in enumerate(paths):
+     ary[i,0]=paths[i].split("/")[-2]
+     ary[i,1]=paths[i].split("/")[-1]
+     ary[i,2:],t1=haralick_features14(cv2.imread(paths[i]))
+     total_time+=t1
+  df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_14.csv",index=True)
+  print("FPS for haralick_14 is",len(paths)/total_time)
+      
+
