@@ -16,7 +16,7 @@ import time
 from .image_read import Dataset
 
 
-def compute_glcm(img, distances=[1], angles=[0], levels=256):
+def compute_glcm(img, distances=[1], angles=[0], levels=32):
     h, w = img.shape
     glcm = np.zeros((levels, levels), dtype=np.uint32)
 
@@ -453,7 +453,7 @@ def weighted_correlation(glcm):
     corr = np.sum(glcm * (i - mean_i) * (j - mean_j)) / (std_i * std_j + 1e-10)
     return corr
 
-def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=256):
+def haralick_features(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
     
     st = time.time()
     if len(img.shape) == 3:
@@ -481,7 +481,7 @@ import time
 from skimage import color
 
 
-def haralick_features14(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=256):
+def haralick_features14(img, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], levels=32):
     
     st = time.time()
 
