@@ -844,8 +844,8 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=color_layout(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_layout.csv",index=True)
-  print("FPS for color_layout is",len(paths)/t1)
-  
+  print("FPS for color_layout is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),1026),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -853,8 +853,8 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=color_correlogram(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"color_correlogram.csv",index=True)
-  print("FPS for color_correlogram is",len(paths)/t1)
-  
+  print("FPS for color_correlogram is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),20),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -862,8 +862,8 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=tamura_features(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"tamura_features.csv",index=True)
-  print("FPS for tamura_features is",len(paths)/t1)
-  
+  print("FPS for tamura_features is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),82),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -871,8 +871,8 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=edge_histogram(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"edge_histogram.csv",index=True)
-  print("FPS for edge_histogram is",len(paths)/t1)
-  
+  print("FPS for edge_histogram is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),170),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -880,17 +880,18 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=jcd_descriptor(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"jcd_descriptor.csv",index=True)
-  print("FPS for jcd_descriptor is",len(paths)/t1)
+  print("FPS for jcd_descriptor is",len(paths)/total_time)
 
   ary=np.zeros((len(paths),632),dtype=object)
+  total_time=0
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
      ary[i,1]=paths[i].split("/")[-1]
      ary[i,2:],t1=PHOG(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"phog.csv",index=True)
-  print("FPS for phog is",len(paths)/t1)
-  
+  print("FPS for phog is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),8),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -898,8 +899,8 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=haralick_features(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_6.csv",index=True)
-  print("FPS for haralick_6 is",len(paths)/t1)
-  
+  print("FPS for haralick_6 is",len(paths)/total_time)
+  total_time=0
   ary=np.zeros((len(paths),16),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
@@ -907,6 +908,6 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
      ary[i,2:],t1=haralick_features14(cv2.imread(paths[i]))
      total_time+=t1
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"haralick_14.csv",index=True)
-  print("FPS for haralick_14 is",len(paths)/t1)
+  print("FPS for haralick_14 is",len(paths)/total_time)
       
 
