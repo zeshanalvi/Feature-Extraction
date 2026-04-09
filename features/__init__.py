@@ -5,11 +5,14 @@ import cv2
 
 from .Lire import get_lires, color_correlogram, color_layout, compute_glcm, edge_histogram, extract_lire, tamura_features, jcd_descriptor, PHOG, haralick_features, haralick_features14
 from .LBP import get_lbps, get_lbp_single
-from .image_read import Dataset
-from .LireGPU import gpu_lires
-from .LireGPU import PHOG as PHOG_gpu, haralick_features as haralick_gpu
-from .LireGPU import color_layout as color_layout_gpu, haralick_features14 as haralick14_gpu
 
+from .image_read import Dataset
+try:
+    from .LireGPU import gpu_lires
+    from .LireGPU import PHOG as PHOG_gpu, haralick_features as haralick_gpu
+    from .LireGPU import color_layout as color_layout_gpu, haralick_features14 as haralick14_gpu
+except Exception as e:
+    print("GPU features not available, using CPU only:", e)
 
 def extract_features_batch_old(img_path,labeled=False):
     dfs = [] 
