@@ -361,8 +361,63 @@ def edge_histogram_slow(img, grid=4):
     edge_hist /= edge_hist.sum() + 1e-8
     t1 = time.time()-st
     return edge_hist,t1
+import cv2
+import numpy as np
+import time
 
-def jcd_descriptor(img, color_bins=64, edge_bins=272):
+def compress_histogram(hist, out_bins):
+    """
+    Compress a 1D histogram to out_bins by summing groups of bins.
+    Uses np.array_split so it works even when lengths do not divide evenly.
+    """
+    hist = np.asarray(hist, dtype=np.float32)
+    parts = np.array_split(hist, out_bins)
+    compressed = np.array([p.sum() for p in parts], dtype=np.float32)
+
+    # Renormalize
+    s = compressed.sum()
+    if s > 0:
+        compressed /= s
+    return compressed
+
+def jcd_descriptor(img):#168
+    # Resize for consistency
+    img_resized = cv2.resize(img, (128, 128))
+    st = time.time()
+
+    # ---- Color Histogram part: 64 bins ----
+    hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+    color_hist = cv2.calcHist(
+        [hsv], [0, 1, 2], None,
+        [4, 4, 4], [0, 180, 0, 256, 0, 256]
+    )
+    color_hist = cv2.normalize(color_hist, color_hist).flatten().astype(np.float32)
+    # color_hist length = 64
+
+    # ---- Edge Histogram part: original 272 bins ----
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=True)
+
+    edge_bins = 272
+    bins = np.int32(ang / 360.0 * edge_bins) % edge_bins
+    edge_hist, _ = np.histogram(bins, bins=edge_bins, range=(0, edge_bins))
+    edge_hist = edge_hist.astype(np.float32)
+
+    # Normalize edge histogram
+    edge_hist /= (edge_hist.sum() + 1e-6)
+
+    # ---- Compress edge histogram: 272 -> 104 ----
+    edge_hist_104 = compress_histogram(edge_hist, 104)
+
+    t1 = time.time() - st
+
+    # Final descriptor: 64 + 104 = 168
+    descriptor = np.hstack([color_hist, edge_hist_104]).astype(np.float32)
+    return descriptor, t1
+
+def jcd_descriptor_older(img, color_bins=64, edge_bins=272):
     # Resize for consistency
     img_resized = cv2.resize(img, (128, 128))
     st = time.time()
