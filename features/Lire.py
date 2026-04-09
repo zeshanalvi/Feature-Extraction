@@ -874,7 +874,7 @@ def get_lires(dataset,paths=None,label=None,storage_path=None,batch_size=1000):
   df = pd.DataFrame(ary, index=pindex).rename_axis("img").to_csv(storage_path+"edge_histogram.csv",index=True)
   print("FPS for edge_histogram is",len(paths)/total_time)
   
-  ary=np.zeros((len(paths),338),dtype=object)
+  ary=np.zeros((len(paths),170),dtype=object)
   for i,p in enumerate(paths):
      ary[i,0]=paths[i].split("/")[-2]
      ary[i,1]=paths[i].split("/")[-1]
